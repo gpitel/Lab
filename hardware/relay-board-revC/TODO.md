@@ -1,38 +1,82 @@
 # revC TODO
 
-## HANDOFF 2026-10-12 -- routing in progress (resume here)
+## STATUS 2026-10-13 (3) -- routed on two layers, DRC clean, no via in a pad, fab + JLC files generated
 
-Routing is done entirely by our own router now (no freerouting). State when this was committed:
-coarse pass routes 64/65 nets; the fine pass (fan-out + rip-up/reroute + exact clearance)
-converges everywhere except the relay-drive lanes, which were still being tuned. The committed
-relay_board.kicad_pcb is the COARSE-routed board (fine pass not finished) -- regenerate, don't
-hand-edit.
+Every net is routed by our own router, **tracks on F.Cu and B.Cu only**. DRC: 0 unconnected,
+0 clearance, 0 shorts, 0 dangling tracks, 0 dangling vias. `parasitic_report.py`: all budgets met.
+No via sits in an SMD pad. Layout ready to order; the firmware build (open items) is not.
+`export_fab.py` (DRC gate passed), `generate_bom.py`, `export_jlcpcb.py` have run; the JLC
+placement file is verified pad for pad against JLC's library footprints (119 placements).
 
-Resume (KiCad 10 interpreter, from hardware/relay-board-revC):
+Rebuild from source (KiCad 10 interpreter, from hardware/relay-board-revC; ~80 min here):
 
     python generate_schematic.py && python verify_board.py && python generate_firmware_map.py
     K="C:/Program Files/KiCad/10.0/bin/python.exe"
-    $K generate_pcb.py && $K maze_route.py && $K maze_route.py --fine
-    $K route_pcb.py --no-freerouting && $K optimize_tracks.py && $K parasitic_report.py
+    $K generate_pcb.py && $K maze_route.py && $K maze_route.py --fine && $K maze_route.py --fine --polish
+    $K route_pcb.py --no-freerouting && $K fix_boxed_pads.py && $K route_pcb.py --stage-fill
+    $K parasitic_report.py
+    python generate_bom.py && python export_fab.py && python export_jlcpcb.py
 
-(coarse ~25 min, fine ~1-2 h). Last open item: the west-column relay lanes (GPIO1-7, 14,
-pins PA3..PB2) cross the north-row/east lanes; maze_route.LAYER_COST now puts that group on
-B.Cu and the others on F.Cu (run v16 was testing this). If they still thrash, consider the
-lane order in generate_schematic.GPIO_PINS or rotating the MCU so its GPIO-rich side faces the
-drivers. Run v16 (layer split) also showed GPIO15 (PA0) and GPIO23 (PA1), adjacent north-row lanes to U4 p1 /
-U6 p2, ripping each other: check their lane order (GPIO23 -> nearer input should be the westmore
-pin) with devtools/astar_test.py before anything else. Not yet run end-to-end: route_pcb --no-freerouting -> optimize_tracks -> parasitic_report
-(coupling audit) -> faraday_review / kicad-happy emc skill. Then export_fab/export_jlcpcb.
+`route_pcb.py --no-freerouting` now does, in order: close track-to-pad gaps, sweep dead copper
+(`cleanup_dangling.py`), open the planes under the floating nodes (with ground bridges through
+rings), GND fan-out and stitching, zone fill, make T-junctions explicit, remove what DRC still
+flags as dangling, DRC.
 
-Done this session (all in source): rev B2 renamed rev C; EU EMC plan (EMC_COMPLIANCE.md);
-firmware watchdog + relay-state restore; driver USB-drop reconnect; L1 CM choke netlist bug
-fixed (TDK ACM2012 windings 1-4/2-3; D+/D- were swapped); MCU pins reassigned in lane order
-(relays N/E/W sides, I2C2 on PB10/11, LEDs + coil switch on the south row, RUN on PA9); north-side
-MCU parts re-placed (VDDA stack over pin 9, NRST over pin 7, C8 in the NE notch for VDD48+VBAT);
-test pads beside their circuits; LEDs moved SW of the MCU; VBUS pre-routed under J1 on B.Cu;
-TMP117 access pocket; measurement nets outer-layers-only with a crosstalk cost; maze router
-fine pass with fan-out, inward vias, exact clearance, net-tie transparency, rip-up (path
-congestion cost, priority classes, protected generator copper and escapes).
+Decided with the user 2026-10-13:
+- Inner layers carry no tracks. They are solid GND except openings that follow the copper of the
+  floating nodes (terminal buses, arms, clips; 0.75 mm margin), with a 1 mm ground bridge through
+  every ring of openings so no ground is left as an island (13 bridges, ~0.1 pF each).
+- East mirrors west: column order A B E D C, link relays K18 (B-D) under D and K17 (B-C) under C.
+- No open stubs: none left in DRC or in Faraday.
+- Force-arm budget 26 mm for A and C (the far iso relay), 16 mm for B and D.
+- VBUS TVS D9 on the VBUS run beside the receptacle; 100 nF C37 at the coil switch IN pin.
+- Clip holes stay 4.0 mm (solder the plugs); 10 pF standard +/-2 %, yellow-green PWR/RUN LEDs,
+  yellow BUSY LED accepted. BNC positions kept. "Kelvin" removed from the board title.
+- Assembly at JLCPCB.
+
+`fix_boxed_pads.py` is a patch of this routed board (it names tracks by their coordinates and
+stops, leaving the file alone, on a board routed differently): after a new full route the pads
+it handles have to be looked at again.
+
+Faraday (d73ca92) on this board: 98 findings, none of them an open stub. What is left and why:
+- plane-crossing (2 grouped, high) + sparse-reference: the openings under the floating nodes, on
+  purpose. Other nets cross them for 778 mm in total (was 1923 mm before the bridges and the
+  0.75 mm margin). Faraday's 1682 / 439 mm figures sum whole segments.
+- esd-clamp-distance (high): D9 is 9 mm of track from the VBUS pin. The VBUS trunk under the
+  receptacle sets that on a single-sided assembly; the USBLC6 (D2) also clamps VBUS ~4 mm from
+  the pin and Faraday does not count it.
+- coupled-bundle / 3W / coupled-run (68): relay-drive lanes, coil returns, LED and strap lines --
+  static during a measurement and river-routed as bundles on purpose; and the standards-column
+  nets, of which one is in use at a time.
+- decoupling-distance (6): the bulk capacitors; every IC has its own 100 nF at the pin.
+- via-stub (23 GHz), diff-skew (1 mm, 6 ps), connector-ground-spread (BNCs follow the end-fed
+  rails, continuous plane between them): not relevant at <= 50 MHz / accepted.
+Tickets for the cases where Faraday is wrong or has no way to be told are filed with the tool's
+maintainer (9 tickets, 2026-10-13); FARADAY_FEEDBACK.md has the notes.
+
+Open before ordering:
+- [ ] Firmware not built against the regenerated relay map (relay pins changed: PF1 -> PC13,
+      PA0..PA2 order mirrored).
+- [ ] /TB is 194 mm long (B reaches the cross-bay link relays K17/K18 around the standards
+      column); calibrated per configuration, but it is the longest floating node.
+- [x] Vias in SMD pads: the router left 88 (63 on the 2026-10-12 handoff board). `vias_out_of_pads.py`
+      (run by `route_pcb.py --no-freerouting`) moves 84 beside their pad; the 4 boxed in by a
+      neighbour's track (U4.14 /K17_COIL, R3.2 /NRST, R40.1 /COIL_EN, R25.2 /FE_AMP) are fixed by
+      `fix_boxed_pads.py`, which moves the neighbour (R40 itself by 0.1 mm). 0 left.
+- [x] Architecture reviewed after N. Rosano's remark (2026-10-13: "the Kelvin lines should be 100 %
+      coaxial"). Decision: keep it as it is -- relays, plane openings under the floating nodes, no
+      driven guard. `simulate_guard.py`: a guard island leaves ~2 pF below 1 MHz but puts a negative
+      conductance across the winding (-53 kohm at 3 MHz, -5.4 kohm at 10 MHz, -250 ohm at 50 MHz),
+      which reads as extra Q at self-resonance and can oscillate. The force/sense coupling of a rigid
+      board is constant and goes with the stored clip-plane short.
+- [ ] On the first rev C boards, measure the real ground capacitance of each terminal (configs
+      17-19, DUT absent and present) against the estimate (~6 / 15 / 8 / 8 pF for A / B / C / D).
+      Reopen the guard question only if that number limits the accuracy.
+- [ ] Store the clip-plane open/short compensation per path in the MCU flash, so the board carries
+      it and the user only ever clamps the DUT.
+- [ ] `optimize_tracks.py` leaves the board worse and restores it: not used.
+- [ ] Silkscreen warnings: 5 LED labels at 0.9 mm (rule 1.0), 'CH2' / 'USB' / '5VIN' text over pads.
+- [ ] Return-path stitching has no room beside 53 signal vias.
 
 ## BOOT0 has no way to be driven high (blank boards cannot be flashed over USB)
 
@@ -156,17 +200,17 @@ parts >= 2.5 mm from the edge (no rails needed), silk 0.15 mm / 1.0 mm text, 3 f
 (1 mm, 2 mm mask, >= 3.35 mm from the edge); no via-in-pad (a paid option on 4 layers).
 
 ### Still to verify before ordering
-- [ ] Route + DRC clean (route_pcb.py), then `parasitic_report.py` updated for the Kelvin nets.
+- [x] Route + DRC clean (2026-10-12); `parasitic_report.py` runs (see STATUS for its two arm-budget failures).
 - [x] CM choke pinout (2026-10-12): TDK ACM2012 windings are 1-4 and 2-3 (TDK equivalent-circuit
       library), not 1-2 / 3-4 -- the first netlist swapped D+/D- at the connector (USB would never
       have enumerated). Netlist fixed, footprint turned 180 deg so the pair reaches D2 uncrossed.
-- [ ] LCSC numbers for OPA356, BAV99, BLM21PG221SN1D, ACM2012, 47 uF 1206 (left to JLC's matcher).
+- [x] LCSC numbers for every JLC BOM line, live stock checked 2026-10-12 (export_jlcpcb.JLC_BASIC).
 - [x] Prototype relays: G6K-2F-Y-TR (C47190, JLC stock) -- decided 2026-10-11; RF-S only if the measured
       open-contact capacitance floor demands it.
 - [ ] Bode 100 SCPI for the CH1 1 Mohm input in Kelvin mode; Kelvin recipe + calibration in
       MagneticCharacterizer; one-time 2-wire fixture compensation (open/short at the clamps).
 - [x] `simulate_calibration.py` (ngspice DLL) and `kelvin_coupling.py` for the SHORT decision.
-- [ ] `export_fab.py` for 4 layers.
+- [x] `export_fab.py` for 4 layers (ran 2026-10-12).
 - [ ] Shorting-bar accessory for the fixture compensation (a 4-clamp bar or dummy header); declare its
       inductance with `--short-bar-nh`.
 - [ ] LCSC for R18 (1R 0.5 % 1206), C30 (10 pF C0G +/-0.1 pF 0603), TMP117AIDRV, TPS2051CDBV,

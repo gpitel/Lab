@@ -12,7 +12,8 @@ Walks the routed board and reports, for every measurement net:
   - copper pour presence under the net (there must be none in the void)
 
 Budgets (rev C, Kelvin; see ARCHITECTURE.md):
-    force arms (DUT_x)   <= 16 mm, 0 vias      (uncalibrated in 2-wire mode)
+    force arms (DUT_x)   <= 16 mm (B, D) / 26 mm (A, C: the far relay), 0 vias
+                         (uncalibrated in 2-wire mode; FORCE_ARM_BUDGET)
     sense arms (DUTS_x)  <= 30 mm, <= 1 via    (carry no current in Kelvin)
     rail feeds           HI + LO force-rail length from each column's NO pad
                          to its feed equal across A..D within 5 % (the
@@ -37,6 +38,14 @@ L_VIA = 1.2e-9
 
 SIGNAL_PREFIXES = ("/DUT_", "/T", "/CAL_", "/RAIL_")
 BUDGET_FAILURES = []
+#: Force-arm budget per terminal, mm. Two iso relays sit side by side between
+#: the two clip rows of each side, so one terminal per side (A, C) has the far
+#: relay: its arm steps around the pair's other clip and is ~24 mm. Accepted
+#: 2026-10-13: in Kelvin mode the arm is in the force path only, in 2-wire mode
+#: it is inside the clamp-plane fixture compensation; halving it would mean
+#: re-placing six relays around the bay for ~10 nH that never reaches a Kelvin
+#: result.
+FORCE_ARM_BUDGET = {"A": 26.0, "B": 16.0, "C": 26.0, "D": 16.0}
 
 
 def is_signal(name):
@@ -230,8 +239,9 @@ def main():
     # Budgets
     for terminal in "ABCD":
         name = f"/DUT_{terminal}"
-        if lengths.get(name, 99) > 16.0:
-            BUDGET_FAILURES.append(f"{name} arm {lengths[name]:.1f} mm > 16 mm")
+        budget = FORCE_ARM_BUDGET[terminal]
+        if lengths.get(name, 99) > budget:
+            BUDGET_FAILURES.append(f"{name} arm {lengths[name]:.1f} mm > {budget:.0f} mm")
         if vias_by_net.get(name, 0) != 0:
             BUDGET_FAILURES.append(f"{name} has vias -- uncalibrated layer change")
         sense = f"/DUTS_{terminal}"
@@ -271,8 +281,7 @@ def main():
                   "(calibrated per configuration; informational)")
 
     coupled, inner = coupling_audit(board)
-    print(f"
-Coupling: measurement copper within {COUPLED_D} mm (3-D, same layer or across the "
+    print(f"\nCoupling: measurement copper within {COUPLED_D} mm (3-D, same layer or across the "
           "0.21 mm prepreg) of coil/supply/digital copper:")
     for name in sorted(coupled, key=coupled.get, reverse=True):
         if coupled[name] >= 0.5:

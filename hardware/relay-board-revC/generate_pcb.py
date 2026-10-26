@@ -100,7 +100,10 @@ DY = 10.0
 
 #: Terminal columns, 22 mm apart; E is the load-standard column. Pole-1
 #: (force) pads land on the column line, pole-2 (sense) pads 7 mm east.
-COLUMNS = {"A": 61.0, "B": 83.0, "E": 105.0, "C": 127.0, "D": 149.0}
+#: East mirrors west: the outer iso relay (K11 / K13) sits over the outer column
+#: (A / C), the inner one (K12 / K14) beside the inner column (B / D), so no
+#: terminal bus has to cross another on its way down (C and D used to).
+COLUMNS = {"A": 61.0, "B": 83.0, "E": 105.0, "D": 127.0, "C": 149.0}
 RELAY_DX = 3.5
 ROW_HI, ROW_LO = 84.0, 96.0
 PAD_NC, PAD_COM, PAD_NO = -0.6, 1.6, 3.8
@@ -116,13 +119,22 @@ HI_FEED_X = 56.0                       # west of column A: SOURCE BNC below
 LO_FEED_X = 160.0                      # east of column D: shunt + CH2 below
 
 #: DUT bay: no copper on any layer.
-BAY = (94.5, 42.5, 115.5, 77.0)
-#: DUT interface: a Kelvin PAIR of 4 mm banana jacks per terminal, F (inner,
-#: toward the DUT) and S (outer), 19.05 mm apart: a lead passes through the F
-#: clip into the S clip, or a dual-banana Kelvin lead plugs straight in.
+#: 41 mm wide: the clip pairs and their iso relays sit as far out as the link
+#: relays K15/K16 allow (the bay height is set by the board edge and the matrix).
+BAY = (84.5, 42.5, 125.5, 77.0)
+#: DUT interface: a Kelvin PAIR of Grayhill 02-21 miniature test clips per
+#: terminal, their banana plugs in plated 4.0 mm holes: F (inner, toward the
+#: DUT) and S (outer), JACK_PITCH apart so both grip the same point of a short
+#: lead (it passes through the F clip into the S clip). The clip is 5.54 mm
+#: thick along the lead and 10.31 mm wide across it: 8 mm leaves 2.5 mm
+#: between the two clips of a pair, the 24 mm rows 13.7 mm between terminals.
+JACK_PITCH = 8.0
 JACK_ROW_A, JACK_ROW_B = 47.5, 71.5
-JACK_F_WEST, JACK_S_WEST = 88.0, 69.0
-JACK_F_EAST, JACK_S_EAST = 122.0, 141.0
+JACK_F_WEST, JACK_S_WEST = 78.0, 78.0 - JACK_PITCH
+JACK_F_EAST, JACK_S_EAST = 132.0, 132.0 + JACK_PITCH
+#: a Kelvin arm that would run over its pair's other hole first steps this far
+#: toward the relay row (clear of the 6.5 mm pads)
+ARM_JOG = 5.5
 ISO_ROW = 59.5                       # iso relays sit between the jack rows
 
 #: Bottom (cable) edge.
@@ -148,8 +160,8 @@ TRUNK_TOP_Y, TRUNK_BOTTOM_Y = 78.2, 106.0
 PLACEMENT = {
     # --- links: same-side pairs next to their iso relays, cross-bay pairs
     #     in the row under the matrix ---
-    "K15": (51.5, 55.0, 0), "K16": (158.5, 55.0, 0),
-    "K17": (139.0, 102.0, 0), "K18": (151.0, 102.0, 0),
+    "K15": (48.5, 55.0, 0), "K16": (162.5, 55.0, 0),
+    "K18": (139.0, 102.0, 0), "K17": (151.0, 102.0, 0),   # B-D under column D, B-C under column C
     # --- standards column: K9/K10 to the rails, K19..K21 pick the standard;
     #     each standard Kelvin-sensed at its pads through a net tie ---
     "K9": (COLUMNS["E"] + RELAY_DX, ROW_HI, 0), "K10": (COLUMNS["E"] + RELAY_DX, ROW_LO, 0),
@@ -186,7 +198,7 @@ PLACEMENT = {
     "J1": (USB_X, BOARD_Y1 - 3.6, 0),
     "D2": (USB_X, 129.3, 0), "L1": (USB_X, 125.4, 270),
     "R1": (USB_X - 4.6, 129.0, 90), "R2": (USB_X + 4.6, 129.0, 90),
-    "FB1": (USB_X - 7.6, 131.4, 90), "C1": (USB_X - 10.4, 131.4, 90),
+    "FB1": (USB_X - 7.6, 130.6, 90), "C1": (USB_X - 10.4, 130.6, 90),
     "U5": (USB_X + 9.0, 127.4, 0), "C3": (USB_X + 9.0, 131.4, 0),
     "C4": (USB_X + 12.6, 127.4, 90),
     "U1": (USB_X, 110.0, -90),
@@ -196,7 +208,9 @@ PLACEMENT = {
     # decouples both (AN4325, VBAT tied to VDD) and leaves the corner where
     # the relay lanes turn free
     "C8": (USB_X + 3.75, 105.55, 45),
-    "C9": (USB_X - 6.6, 112.75, 0),         # VDD 24
+    # VDD 24; 1.85 mm south of the pin row so the I2C pins above it (21, 22)
+    # keep their outward escapes (beside the row it forced SDA under the MCU)
+    "C9": (USB_X - 6.6, 114.6, 0),
     "C16": (USB_X + 2.6, 116.4, 0),         # VDDIO2 36
     # North side (the row facing the drivers) keeps its relay pins' lanes
     # free: the VDDA filter stacks vertically over VSSA/VDDA (pins 8/9) only,
@@ -213,8 +227,13 @@ PLACEMENT = {
     # BOOT0 strap parts east of the relay corridor (the east pins' relay
     # lines run north at x < USB_X + 11), by SW1/J8 they connect to: a static
     # strap, a few mm of track cost nothing; the pins and the corridor need room
-    "R4": (USB_X + 13.5, 107.0, 90), "R17": (USB_X + 15.1, 107.0, 90),
-    "J8": (USB_X + 14.0, 115.4, 0),         # Cortex debug 2x5, at the MCU
+    # BOOT0 strap resistors beside the BOOT button, out of the east lane fan
+    # (between the MCU and the SWD header the relay lanes boxed them in)
+    "R4": (USB_X + 19.0, 122.0, 90), "R17": (USB_X + 20.6, 122.0, 90),
+    # Cortex debug 2x5, at the MCU; turned 180 deg so the SWDIO/SWCLK column
+    # faces the MCU: on the far column they looped north around the header,
+    # through the east relay-lane fan
+    "J8": (USB_X + 14.0, 115.4, 180),
     "SW1": (205.0, 128.0, 90), "SW2": (205.0, 115.0, 90),
     "TP1": (198.0, 133.6, 0), "TP2": (200.6, 133.6, 0),
     # status LEDs in a column at the east edge, resistors beside them
@@ -222,11 +241,12 @@ PLACEMENT = {
     # south row westward with the coil-switch lines (U11), in lane order --
     # PROG, KELVIN, BUSY, RUN top to bottom as pins PB14, PB15, PA8, PA9 run
     # west to east -- resistors on the east side facing the incoming lines.
-    "D8": (160.2, 120.4, 0), "R35": (163.0, 120.4, 0),    # PROG
-    "D7": (160.2, 122.4, 0), "R34": (163.0, 122.4, 0),    # KELVIN
-    "D6": (160.2, 124.4, 0), "R33": (163.0, 124.4, 0),    # BUSY
-    "D1": (160.2, 126.4, 0), "R10": (163.0, 126.4, 0),    # RUN
-    "D5": (160.2, 128.4, 0), "R32": (163.0, 128.4, 0),    # PWR
+    # series resistors turned 180: LED-side pad toward the LED, MCU-side pad east
+    "D8": (160.2, 120.4, 0), "R35": (163.0, 120.4, 180),  # PROG
+    "D7": (160.2, 122.4, 0), "R34": (163.0, 122.4, 180),  # KELVIN
+    "D6": (160.2, 124.4, 0), "R33": (163.0, 124.4, 180),  # BUSY
+    "D1": (160.2, 126.4, 0), "R10": (163.0, 126.4, 180),  # RUN
+    "D5": (160.2, 128.4, 0), "R32": (163.0, 128.4, 180),  # PWR
     # drivers above the MCU, outputs west toward the relays
     "U2": (USB_X, 50.0, 180), "C5": (USB_X - 2.5, 43.5, 0),
     "U3": (USB_X, 63.0, 180), "C6": (USB_X - 2.5, 56.5, 0),
@@ -248,11 +268,14 @@ PLACEMENT.update({
     "J14": (JACK_F_EAST, JACK_ROW_A, 0), "J15": (JACK_S_EAST, JACK_ROW_A, 0),   # C F/S
     "J16": (JACK_F_EAST, JACK_ROW_B, 0), "J17": (JACK_S_EAST, JACK_ROW_B, 0),   # D F/S
     # --- isolation relays between the jack rows, poles toward their jacks ---
-    "K11": (71.5, ISO_ROW, 180), "K12": (85.5, ISO_ROW, 180),
-    "K13": (138.5, ISO_ROW, 0), "K14": (124.5, ISO_ROW, 0),
+    "K11": (61.5, ISO_ROW, 180), "K12": (75.5, ISO_ROW, 180),
+    "K13": (148.5, ISO_ROW, 0), "K14": (134.5, ISO_ROW, 0),
     # --- coil supply switch, VBUS TVS, USB shield option (cable edge) ---
-    "U11": (169.0, 129.5, 90), "R40": (166.6, 127.6, 90), "R41": (166.6, 131.2, 90),
-    "D9": (172.2, 136.8, 90),               # VBUS TVS beside FB1 (VBUS side)
+    "U11": (169.0, 129.5, 90), "R40": (166.5, 127.6, 90), "R41": (166.6, 131.2, 90),
+    "C37": (168.05, 126.5, 90),             # 100 nF at U11's IN pin (pin 5, just south of it)
+    # VBUS TVS on the VBUS run from the receptacle to FB1 (pad 1 sits on that track)
+    # (beside FB1 it hung 10 mm of track away: ~240 V of overshoot before it acts)
+    "D9": (171.2, 143.7, 180),
     "R36": (187.0, 144.6, 90), "R37": (188.6, 144.6, 90), "C31": (190.2, 144.6, 90),
     # --- 10 uF per driver, at its COM pin side ---
     "C32": (172.6, 46.5, 90), "C33": (172.6, 59.5, 90),
@@ -555,7 +578,9 @@ class Board:
         """Kelvin arms, jack -> iso NC. Uncalibrated in 2-wire mode (the clamp
         -plane fixture compensation removes them), so short, F.Cu only, no
         vias: out of the jack along its row to a lane 2 mm beside the relay
-        pole, straight down/up the lane, onto the NC pad."""
+        pole, straight down/up the lane, onto the NC pad. With the pair only
+        JACK_PITCH apart, an arm whose row run would cross the pair's other
+        hole steps ARM_JOG toward the relay row first."""
         pairs = {"A": ("J10", "J11", "K11"), "B": ("J12", "J13", "K12"),
                  "C": ("J14", "J15", "K13"), "D": ("J16", "J17", "K14")}
         for terminal, (force_jack, sense_jack, iso) in pairs.items():
@@ -564,7 +589,12 @@ class Board:
                 jx, jy = self.pad_position(jack, 1)
                 nx, ny = self.pad_position(iso, nc_pad)
                 lane = nx + (2.0 if jx > nx else -2.0)
-                self.track([(jx, jy), (lane, jy), (lane, ny), (nx, ny)], net)
+                other = self.pad_position(sense_jack if jack == force_jack else force_jack, 1)[0]
+                if min(jx, lane) < other < max(jx, lane):
+                    row = jy + (ARM_JOG if ny > jy else -ARM_JOG)
+                    self.track([(jx, jy), (jx, row), (lane, row), (lane, ny), (nx, ny)], net)
+                else:
+                    self.track([(jx, jy), (lane, jy), (lane, ny), (nx, ny)], net)
 
     def route_rails(self):
         """Force rails (B.Cu) and sense rails (In2.Cu) with a via tap beside
@@ -911,8 +941,12 @@ class Board:
                       (BOARD_X1 - 0.6, BOARD_Y1 - 0.6), (BOARD_X0 + 0.6, BOARD_Y1 - 0.6)]
         for layer in (pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.F_Cu, pcbnew.B_Cu):
             self.polygon_zone("/GND", layer, board_poly, priority=0)
-        self.void_area([pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.B_Cu], "measurement_void")
-        self.void_area([pcbnew.In2_Cu], "measurement_void_in2", self.guard_strips())
+        # outer layers: no pour in the measurement area. Inner layers: solid GND
+        # under everything -- they carry no tracks -- except under the nodes that
+        # float at an intermediate potential (terminal buses, arms, clips), where
+        # ground capacitance is a DUT-dependent error (Cg*v*(v-1)). Those
+        # openings follow the routed copper: route_pcb.float_node_voids().
+        self.void_area([pcbnew.F_Cu, pcbnew.B_Cu], "measurement_void")
         every = [pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.B_Cu]
         x0, y0, x1, y1 = BAY
         self.polygon_zone(None, every, [(x0, y0), (x1, y0), (x1, y1), (x0, y1)],
@@ -981,7 +1015,7 @@ class Board:
             item.SetTextThickness(mm(max(JLC["silk_line"], size * (0.2 if bold else 0.15))))
             self.board.Add(item)
 
-        text("OpenMagnetics Relay Board rev C  Kelvin", 118.0, 138.0, 1.4, bold=True)
+        text("OpenMagnetics Relay Board rev C", 118.0, 138.0, 1.4, bold=True)
         bx0, by0, bx1, by1 = BAY
         text("DUT", (bx0 + bx1) / 2, (by0 + by1) / 2, 2.0, bold=True)
         for reference, label in (("J10", "A-F"), ("J11", "A-S"), ("J12", "B-F"), ("J13", "B-S"),
@@ -990,7 +1024,7 @@ class Board:
             text(label, x, y - 6.6 if y < ISO_ROW else y + 6.6, 1.2, bold=True)
         text("lead: through F, then S", (bx0 + bx1) / 2, by1 - 2.0, 1.0)
         for reference, ((x, y), label) in TEST_PADS.items():
-            text(label, x, y - 1.8, 0.8)
+            text(label, x, y - 2.0, 1.0)
         for x1, y1, x2, y2 in ((bx0, by0, bx1, by0), (bx0, by1, bx1, by1),
                                (bx0, by0, bx0, by1), (bx1, by0, bx1, by1)):
             shape = pcbnew.PCB_SHAPE(self.board)
@@ -1142,7 +1176,8 @@ def main():
     builder.place_components()
     builder.route_arms()
     builder.route_rails()
-    builder.route_coil_tree()
+    # the +5 V coil feed is no longer pre-routed on In1: tracks stay on the outer
+    # layers (maze_route.py routes /+5V), the inner layers are planes and guards only
     builder.route_usb_entry()
     builder.fanout_ground()
     builder.planes()

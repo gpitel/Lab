@@ -1,0 +1,21 @@
+(footprint "Grayhill_02-21_BananaPlug_4mm"
+	(version 20240108)
+	(generator "OpenMagnetics")
+	(layer "F.Cu")
+	(descr "Plated 4.0 mm hole for the standard banana plug of a Grayhill 02-21 miniature test clip (Series 02 datasheet: clip .406 in / 10.31 mm wide, .218 in / 5.54 mm thick, .625 in / 15.88 mm tall, plug .937 in / 23.80 mm long). The plug springs in the plated barrel; solder it for a permanent fixture. Courtyard = clip envelope with the lead running along X. The plug stands ~22 mm below a 1.6 mm board: use >= 25 mm standoffs.")
+	(tags "grayhill 02-21 test clip banana plug 4mm kelvin")
+	(attr through_hole exclude_from_pos_files)
+	(fp_text reference "REF**"
+		(at 0 -6.2 0)
+		(layer "F.Fab")
+		(effects (font (size 1 1) (thickness 0.15)))
+	)
+	(fp_text value "Grayhill 02-21"
+		(at 0 6.2 0)
+		(layer "F.Fab")
+		(effects (font (size 1 1) (thickness 0.15)))
+	)
+	(fp_rect (start -2.77 -5.155) (end 2.77 5.155) (stroke (width 0.1) (type solid)) (fill none) (layer "F.Fab"))
+	(fp_rect (start -3.0 -5.4) (end 3.0 5.4) (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd"))
+	(pad "1" thru_hole circle (at 0 0) (size 6.5 6.5) (drill 4.0) (layers "*.Cu" "*.Mask"))
+)

@@ -83,9 +83,9 @@ LAYER_Z = (0.0, 0.245, 1.325, 1.57)    # JLC04161H-7628 copper heights, mm
 #: reference -> mm of free board kept around it by the coarse pass
 ACCESS_POCKETS = {"U12": 1.5, "C36": 0.8}
 
-#: Per-net layer preference (F, In1, In2, B): coil returns favour In1.
+#: Per-net layer preference (F, In1, In2, B); the inner layers carry no tracks at all.
 DEFAULT_LAYER_COST = (1.0, 1.15, 1.15, 1.0)
-LAYER_COST = {f"/K{k}_COIL": (1.4, 1.0, 1.8, 1.4) for k in range(1, 24)}
+LAYER_COST = {}
 # The VBUS feed has to cross the USB chain (J1 -> D2 -> L1 -> MCU runs north
 # between FB1 and U5/U11): the supply crosses underneath on B.Cu, the USB pair
 # stays on F.Cu, unbroken and via-free.
@@ -97,6 +97,7 @@ LAYER_COST.update({name: (1.0, 1.15, 1.15, 3.0) for name in
 # lanes on its way to the far drivers -- it runs on B.Cu, they run on F.Cu,
 # so the crossings cost nothing but the vias at the lane ends.
 LAYER_COST.update({f"/GPIO{k}": (3.0, 1.15, 1.15, 1.0) for k in (1, 2, 3, 4, 5, 6, 7, 14)})
+LAYER_COST["/NRST"] = (3.0, 1.15, 1.15, 1.0)      # static: under the lane fans (BEFORE_LANES)
 LAYER_COST.update({f"/GPIO{k}": (1.0, 1.15, 1.15, 3.0)
                    for k in range(8, 24) if k != 14})
 #: Left to freerouting on purpose: nets that land on 0.5 mm-pitch pins (MCU
@@ -239,6 +240,20 @@ class Grid:
             y0, y1 = pcbnew.ToMM(box.GetTop()) - 0.75, pcbnew.ToMM(box.GetBottom()) + 0.75
             j0, j1, i0, i1 = self._window(x0, y0, x1, y1)
             self.via_block[j0:j1, i0:i1] = True
+        # --no-via-in-pad: no via in or overlapping an SMD pad, the net's own
+        # pads included (an open via in a pad drains the solder joint). Only for
+        # single-net re-routes: with it on for the whole fine pass 18 nets found
+        # no route. vias_out_of_pads.py moves the vias afterwards and
+        # route_pcb.py re-routes the nets it could not help with this flag.
+        reach = VIA_DIAMETER / 2
+        for footprint in (board.GetFootprints() if "--no-via-in-pad" in sys.argv else ()):
+            for pad in footprint.Pads():
+                if pad.GetAttribute() != pcbnew.PAD_ATTRIB_SMD:
+                    continue
+                box = pad.GetBoundingBox()
+                j0, j1, i0, i1 = self._window(pcbnew.ToMM(box.GetLeft()) - reach, pcbnew.ToMM(box.GetTop()) - reach,
+                                              pcbnew.ToMM(box.GetRight()) + reach, pcbnew.ToMM(box.GetBottom()) + reach)
+                self.via_block[j0:j1, i0:i1] = True
         for item in board.GetTracks():
             net = item.GetNetCode()
             if item.GetClass() == "PCB_VIA":
@@ -507,9 +522,11 @@ def _route_net(board, grid, name, width, nets_by_name, added):
         islands.sort(key=len, reverse=True)
         ok = grid.free_for(net, half)
         via_ok = grid.via_ok(ok, net)
-        if not (name.endswith("_COIL") or name == "/+5V"):   # inner: coil feed/returns only
-            for layer in (LAYERS.index(pcbnew.In1_Cu), LAYERS.index(pcbnew.In2_Cu)):
-                ok[layer] &= grid.copper[layer] == net
+        # no net routes on the inner layers: they are for planes and guard copper
+        # only (the +5 V coil tree and the coil returns used to run on In1/In2
+        # inside the void, 0.21 mm under the measurement tracks on F.Cu)
+        for layer in (LAYERS.index(pcbnew.In1_Cu), LAYERS.index(pcbnew.In2_Cu)):
+            ok[layer] &= grid.copper[layer] == net
         for l, j, i in blocked:
             ok[l, j, i] = False
         for j, i in via_blocked:
@@ -633,7 +650,13 @@ ESCAPES = set()
 #: Nets whose fine-pitch pin escapes inward (via under the package) before
 #: trying outward: BOOT0 sits between east-side relay pins and must cross
 #: all their lanes to reach its strap resistors; it is static, a via is free.
-INWARD_FIRST = {"/BOOT0"}
+INWARD_FIRST = {"/BOOT0", "/NRST"}
+
+#: Lanes that run on B.Cu (the west-column relay pins, see LAYER_COST): their
+#: escape ends in a via. Left to the grid router, the eight vias landed in one
+#: column, drifted south until the last had no room, and the B.Cu runs wound
+#: around the MCU's south-west corner over the I2C exit.
+VIA_ESCAPE = {f"/GPIO{k}" for k in (14, 1, 2, 3, 4, 5, 6, 7)}
 
 
 def escape_fine_pitch(board, grid, nets_by_name):
@@ -682,6 +705,15 @@ def escape_fine_pitch(board, grid, nets_by_name):
             via_r = VIA_DIAMETER / 2
             heel = (px - n[0] * hw, py) if hw > hh else (px, py - n[1] * hh)   # inner pad end
             candidates = []
+            # 0. B.Cu lanes: the fan stub ends in a via, alternate pins at
+            # alternate lengths (two staggered via columns)
+            if name in VIA_ESCAPE:
+                odd = pad.GetNumber().isdigit() and int(pad.GetNumber()) % 2
+                for length in ((3.0, 2.0, 2.5, 1.5) if odd else (2.0, 3.0, 1.5, 2.5)):
+                    shift = (FANOUT_SPREAD - 1.0) * length / FANOUT_LENGTHS[0]
+                    end_point = (toe[0] + n[0] * length + offset[0] * shift,
+                                 toe[1] + n[1] * length + offset[1] * shift)
+                    candidates.append(([(px, py), toe, end_point], end_point))
             # 1. outward fan, no via
             for length in FANOUT_LENGTHS:
                 shift = (FANOUT_SPREAD - 1.0) * length / FANOUT_LENGTHS[0]
@@ -878,11 +910,44 @@ def route_fine(board, grid, nets_by_name):
         # rebuild the raster and the exact oracle from the board as it now is
         grid = build_grid(board, nets_by_name)
         grid.exact = ex.build_obstacles(board)
-        queue = [name] + [v for v in victims if v not in queue] + [q for q in queue if q not in victims]
+        victims.sort(key=lambda v: LANE_ORDER.index(v) if v in LANE_ORDER else -1)
+        # victims go right behind the net that displaced them, whether or not they
+        # were still waiting (a waiting victim used to be dropped from the queue
+        # altogether: never routed, and the pass still reported 0 unrouted)
+        queue = [name] + victims + [q for q in queue if q not in victims and q != name]
+    # last word for the nets that ran out of rip-ups: with every other net
+    # settled, the corridor they needed is often free again
+    for name in list(failed) + [n for n in sys.argv if n.startswith("--retry=")]:
+        name = name.split("=", 1)[-1]
+        if name not in nets_by_name:
+            continue
+        grid = build_grid(board, nets_by_name)
+        grid.exact = ex.build_obstacles(board)
+        width = widths.get(name, dict(NETS).get(name, FINE_WIDTHS.get(name, 0.2)))
+        done, tracks, vias = route_net(board, grid, name, width, nets_by_name)
+        print(f"  {name:12s} {'ok ' if done else 'FAIL'} {tracks:3d} segments {vias:2d} vias  (final retry)")
+        if done and name in failed:
+            failed.remove(name)
     board.Save(BOARD)
     print(f"fine pass: {len(failed)} nets unrouted" + (f": {failed}" if failed else ""))
     return 1 if failed else 0
 
+
+#: Relay-drive lanes in river order (each lane hugs the one routed before it,
+#: so none seals a later pad -- shortest-span order let them rip each other
+#: forever). Three bundles, see generate_schematic.GPIO_PINS: the north-row
+#: pins west of the VDDA parts reach U6/U4 from the west under U6 (inner
+#: lane = eastmost pin first); the east channel, nearest input first; the
+#: west column on B.Cu from staggered escape vias (VIA_ESCAPE), northmost
+#: pin first: parallel diagonals under the MCU.
+LANE_ORDER = [f"/GPIO{k}" for k in (22, 23, 15, 16, 17, 18, 19, 20, 21, 8, 9, 10, 11, 12, 13,
+                                     14, 1, 2, 3, 4, 5, 6, 7)]
+#: Nets routed just ahead of the lane block. NRST runs from the north row to
+#: the SWD header and the reset button, across the whole east lane fan: it is
+#: static, so it dives under the package (INWARD_FIRST), runs on B.Cu
+#: (LAYER_COST) and is in place before the lanes. (I2C ahead of the lanes
+#: made things worse; with the west lanes on staggered vias it fits after.)
+BEFORE_LANES = ("/NRST",)
 
 #: Fine-pass widths (mm); anything not listed is 0.2 (JLC minimum 0.15).
 FINE_WIDTHS = {"/+3V3": 0.3, "/+3V3A": 0.3, "/VBUS": 0.4, "/USB_SHIELD": 0.3}
@@ -906,7 +971,15 @@ def fine_nets(board, nets_by_name):
             continue
         xs, ys = zip(*points)
         order.append((max(xs) - min(xs) + max(ys) - min(ys), name))
-    return [(name, widths.get(name, FINE_WIDTHS.get(name, 0.2))) for _, name in sorted(order)]
+    names = [name for _, name in sorted(order)]
+    # the relay-drive lanes go as one block, in river order, where the first
+    # of them stood: the short nets around the MCU pins are already in place
+    lanes = [name for name in LANE_ORDER if name in names]
+    if lanes:
+        first = min(names.index(name) for name in lanes)
+        ahead = [name for name in names[first:] if name in BEFORE_LANES]
+        names = [name for name in names[:first] if name not in lanes] + ahead + lanes             + [name for name in names[first:] if name not in lanes and name not in ahead]
+    return [(name, widths.get(name, FINE_WIDTHS.get(name, 0.2))) for name in names]
 
 
 RIP_RADIUS = 2.0                       # mm around an unreachable pad, first attempt;
@@ -965,6 +1038,95 @@ def rip_up_around(board, grid, name, nets_by_name, protected, radius=RIP_RADIUS)
     return sorted(names)
 
 
+#: polish: a net is re-routed when its copper is this much longer than the
+#: half-perimeter of its pads (rip-up and reroute joins islands in whatever
+#: order they come up: one relay line ran 150 mm around the MCU for a 70 mm hop)
+POLISH_DETOUR = 1.6
+POLISH_MIN_LENGTH = 25.0               # mm
+
+
+def polish(board, nets_by_name):
+    """After the fine pass: take each net with a long detour off the board
+    (its escape stubs and the generator's pre-routes stay), route it again on
+    its own with every other net in place, and keep the result only if it is
+    shorter. Run as `maze_route.py --fine --polish`."""
+    import json
+    import optimize_tracks as ex
+    protected = set()
+    prerouted = os.path.join(HERE, "relay_board_prerouted.json")
+    if os.path.exists(prerouted):
+        protected = set(json.load(open(prerouted)))
+    widths = dict(fine_nets(board, nets_by_name))
+    spans = {}
+    for footprint in board.GetFootprints():
+        for pad in footprint.Pads():
+            p = pad.GetPosition()
+            spans.setdefault(pad.GetNetname(), []).append((pcbnew.ToMM(p.x), pcbnew.ToMM(p.y)))
+
+    def cost(items):
+        return sum(pcbnew.ToMM(item.GetLength()) if item.GetClass() == "PCB_TRACK" else VIA_COST for item in items)
+
+    def movable(name):
+        net = nets_by_name[name].GetNetCode()
+        tracks = [item for item in board.GetTracks() if item.GetNetCode() == net
+                  and item.m_Uuid.AsString() not in protected]
+        stubs = [item for item in tracks if item.GetClass() == "PCB_TRACK"
+                 and abs(pcbnew.ToMM(item.GetWidth()) - FANOUT_WIDTH) < 1e-3]
+        ends = [(pcbnew.ToMM(point.x), pcbnew.ToMM(point.y)) for item in stubs
+                for point in (item.GetStart(), item.GetEnd())]
+        keep = {id(item) for item in stubs}
+        for item in tracks:                              # the via an escape stub ends in
+            if item.GetClass() == "PCB_VIA":
+                p = item.GetPosition()
+                if any(math.dist((pcbnew.ToMM(p.x), pcbnew.ToMM(p.y)), end) < 0.01 for end in ends):
+                    keep.add(id(item))
+        return [item for item in tracks if id(item) not in keep]
+
+    candidates = []
+    for name, points in spans.items():
+        if name in ("", "/GND") or name not in nets_by_name or name in MEASUREMENT or len(points) < 2:
+            continue
+        xs, ys = zip(*points)
+        direct = (max(xs) - min(xs)) + (max(ys) - min(ys))
+        length = sum(pcbnew.ToMM(item.GetLength()) for item in movable(name) if item.GetClass() == "PCB_TRACK")
+        if length > POLISH_MIN_LENGTH and length > POLISH_DETOUR * max(direct, 1.0):
+            candidates.append((length / max(direct, 1.0), name, length))
+    only = [a.split("=", 1)[1] for a in sys.argv if a.startswith("--polish-net=")]
+    if not only:
+        # one process per net: pcbnew's SWIG wrappers lose their types after a
+        # few remove / add-back cycles on one board object
+        import subprocess
+        improved = 0
+        for ratio, name, length in sorted(candidates, reverse=True):
+            result = subprocess.run([sys.executable, os.path.abspath(__file__), "--fine", "--polish",
+                                     f"--polish-net={name}"], capture_output=True, text=True)
+            line = [l for l in result.stdout.splitlines() if l.startswith(("  ~", "  ="))]
+            print(line[-1] if line else f"  ? {name}: {result.stderr.strip().splitlines()[-1:]}", flush=True)
+            improved += bool(line and line[-1].startswith("  ~"))
+        print(f"polish: {improved} of {len(candidates)} detouring nets re-routed shorter")
+        return 0
+    name = only[0]
+    ratio = dict((n, r) for r, n, _ in candidates).get(name, 0.0)
+    old = movable(name)
+    before = cost(old)
+    for item in old:
+        board.Remove(item)
+    grid = build_grid(board, nets_by_name)
+    grid.exact = ex.build_obstacles(board)
+    added = []
+    width = widths.get(name, dict(NETS).get(name, FINE_WIDTHS.get(name, 0.2)))
+    done, _, _ = _route_net(board, grid, name, width, nets_by_name, added)
+    after = cost(added)
+    # --polish-force: keep any complete route (used to re-route a net whose
+    # via could not be moved out of a pad, see vias_out_of_pads.py)
+    if done and (after < before - 1.0 or "--polish-force" in sys.argv):
+        board.Save(BOARD)
+        print(f"  ~ {name:12s} {before:6.1f} -> {after:6.1f} mm-equivalent (was {ratio:.1f}x its pad span)")
+    else:                                 # nothing saved: the board on disk is untouched
+        print(f"  = {name:12s} kept ({'no shorter route' if done else 'no route alone'}; {ratio:.1f}x its pad span)")
+    return 0
+
+
 def main():
     board = pcbnew.LoadBoard(BOARD)
     nets_by_name = {n.GetNetname(): n for n in board.GetNetsByNetcode().values()}
@@ -972,6 +1134,8 @@ def main():
     nets_by_name = {n.GetNetname(): n for n in board.GetNetsByNetcode().values()}
     grid.set_classes(nets_by_name)
     failed = []
+    if FINE and "--polish" in sys.argv:
+        return polish(board, nets_by_name)
     if FINE:
         grid.exact = escape_fine_pitch(board, grid, nets_by_name)
         return route_fine(board, grid, nets_by_name)

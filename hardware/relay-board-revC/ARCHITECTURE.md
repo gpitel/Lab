@@ -17,14 +17,14 @@ switching matrix, plus fixture compensation):
 | Change | Rev B | Rev C |
 |---|---|---|
 | Kelvin | 2-wire to the clamps | **force + sense per terminal**: clamp pad 1 = F, pad 2 = S. Every signal relay is DPDT: pole 1 switches force, pole 2 switches the same terminal's sense. Sense rails go to an on-board differential front-end that can drive CH1 |
-| 2-wire mode | -- | tie relay K23 (de-energized = tied) joins SNS_HI/SNS_LO to RAIL_HI/RAIL_LO: sense becomes a parallel force path, so 2-wire mode halves contact R and arm L and keeps the B-WIC bridge exactly as in rev B |
+| 2-wire mode | -- | tie relay K22 (de-energized = tied) joins SNS_HI/SNS_LO to RAIL_HI/RAIL_LO: sense becomes a parallel force path, so 2-wire mode halves contact R and arm L and keeps the B-WIC bridge exactly as in rev B |
 | Links | LINK rail + 4 column relays, 14.5 pF to GND, 39-94 nH loops | 4 direct bus-to-bus relays A-B, C-D, B-C, B-D (covers every link config in use: 2, 4, 5, 6, 18, 19) |
 | SHORT standard | closes the HI terminal's LO relay: skips the LO terminal's bus + contact | unchanged on board (an exact Kelvin zero on this topology); the residual is removed by clamp-plane fixture compensation. Four SHORT relays were designed, simulated and dropped (section 3) |
 | Rail feeds | both near the middle: HI+LO = 88/44/44/88 mm | HI fed at the A end, LO at the D end: equal for every column |
 | Standards | R5 100R 2-wire | standards column: K19..K21 select 100R (LOAD), 1R and 10 pF (check standards), each Kelvin-sensed at its pads |
 | CH1 source | divider only | K23 selects divider (2-wire, default) or front-end output (Kelvin) |
 | Relays | 18 | 23 (8 matrix, 2 standards column, 4 iso, 4 link, 3 standard select, tie, CH1 select) |
-| Stackup | 4 layers | 4 layers JLC04161H-7628, SIG/GND/GND/SIG (two solid GND planes outside the measurement void) |
+| Stackup | 4 layers | 4 layers JLC04161H-7628, SIG/GND/GND/SIG: tracks on the outer layers only; the inner layers are solid GND except openings that follow the floating nodes (terminal buses, arms, clips) |
 
 Relay map (bit n-1 drives K n):
 
@@ -116,9 +116,9 @@ and CE paperwork: [EMC_COMPLIANCE.md](EMC_COMPLIANCE.md).
 | Board noise off the USB cable | VBUS ferrite FB1 (2 A) at the connector, CM choke L1 on D+/D-, USBLC6 within a few mm of J1 | Wurth ANP007a; eeNews USB EMC |
 | USB inrush (<= 10 uF equivalent) | C1 10 uF, C2 4.7 uF; relays only after enumeration (firmware) | USB 2.0 7.2.4.1 |
 | Coil switching di/dt | TBD62003 COM on +5V (internal clamps), coils energized one at a time 2 ms apart, <= 16 energized (500 mA budget) | Keithley Switching Handbook 4; firmware 2.0.0 |
-| Coil feed loop area | +5V coil tree on In1 directly under the relays; returns routed on the adjacent signal layers | Keithley Switching Handbook 5.3 |
+| Coil feed loop area | +5V coil feed and coil returns on the outer layers, over solid GND wherever they do not cross a floating-node opening; coils are DC during a measurement and switched one at a time | Keithley Switching Handbook 5.3 |
 | Plane edges and cavity resonance | GND stitching vias every 4 mm along the board edge and around the measurement void (lambda/20 at 1 GHz = 7 mm); 20H rule NOT used | LearnEMC (Hubing), "EMC design myths" |
-| Quiet measurement region | planes voided on all layers under the bay, buses and matrix (nodes at intermediate potential: ground C there is a DUT-dependent error); planes kept under the bridge band and BNC launches | Keysight Impedance Measurement Handbook 2.4.7/3.4.2; TI OPA656 layout |
+| Quiet measurement region | no outer-layer pour in the measurement area; the inner GND planes are opened only under the nodes that float at an intermediate potential (terminal buses, arms, clips: ground C there is a DUT-dependent error) and are solid under the rails, the standards column, the bridge band and the BNC launches | Keysight Impedance Measurement Handbook 2.4.7/3.4.2; TI OPA656 layout |
 | MCU | 100 nF at every supply pin + 4.7 uF, VDDA ferrite + 1 uF + 10 nF, NRST 100 nF, no crystal (HSI48 + CRS), outputs at low slew (reset default), unused pins analog | ST AN4325, STM32F072 datasheet |
 | Analog front-end immunity | 100 R + clamp at each input, AC-coupled, 0.1 % difference stage, ferrite-filtered +5VA | TI/ADI op-amp layout notes |
 | Ground loop PC-USB-board-BNC-Bode | the Kelvin difference stage rejects it (60 dB); a USB isolator is the documented option if pre-compliance or low-Z measurements need more | Signal Integrity Journal, "2-port shunt-thru ground loop"; Omicron B-LCM |
@@ -126,20 +126,23 @@ and CE paperwork: [EMC_COMPLIANCE.md](EMC_COMPLIANCE.md).
 Stackup JLC04161H-7628, 4 layers (decided 2026-10-11 after comparing with 6): L1 F.Cu /
 0.2104 mm 7628 (er 4.4) / L2 In1 GND / 1.065 mm core (er 4.6) / L3 In2 GND / 0.2104 mm 7628 /
 L4 B.Cu, written into the board file. SIG/GND/GND/SIG: every signal layer is 0.21 mm from a solid
-GND plane outside the measurement void; inside it the inner layers carry only locked routing
-(+5V coil tree, hand-routed measurement nets) and the In2 guard strips under the rails. Six
-layers bought no routing room inside the void (planes are voided there either way) and only
+GND plane, and the inner layers carry no tracks at all (decided 2026-10-13). The planes are
+opened only under the floating nodes, following their routed copper with a 0.75 mm margin, with
+a 1 mm ground bridge through every ring of openings so no ground is left as an island
+(`route_pcb.float_node_voids`). Six layers bought no routing room and only
 stripline margin for a board whose fastest signal is USB full-speed. Every signal via outside the
 void gets a GND stitching via within 1.5 mm (return current changes planes there); decoupling
 caps get their GND via beside the pad at 90 degrees to the pad axis, facing their IC (smallest
 pad-via-plane loop).
 
-**Layer use and coupling (routing rules, maze_route.py).** Outside the measurement void every
-signal is on F.Cu or B.Cu and both inner layers are solid GND. Inside the void the planes are
-removed (ground capacitance at intermediate-potential nodes is a DUT-dependent error), and the
-inner layers carry only the +5V coil feed and the coil returns (In1, feed and return side by
-side: smallest switching loop; DC during a measurement) and the In2 guard strips under the
-rails. Measurement nets are restricted to the outer layers. Crosstalk between measurement copper
+**Layer use and coupling (routing rules, maze_route.py).** Every net is on F.Cu or B.Cu; both
+inner layers are GND only. Ground under copper that always sits at the HI or LO potential (rails,
+feeds, standards column) costs nothing: the bridge senses current in LO only and the per-path
+OSL absorbs it. Under the nodes that float at an intermediate potential (terminal buses, arms,
+clips) the planes are opened, because ground capacitance there enters as Cg*v*(v-1), a
+DUT-dependent error (rev B measured 14.5 pF on its link net). Until 2026-10-13 the whole
+measurement area was open and the +5V coil feed and coil returns ran on In1/In2 inside it,
+0.21 mm under the measurement tracks. Crosstalk between measurement copper
 and anything that switches or carries supply (coils, supplies, digital) is a routing cost: each
 step costs 1 + 6K, K = 1/(1 + (d/H)^2) (parallel-line coupling coefficient, H. Johnson), d the
 3-D distance to the other class's copper on the same layer or across the 0.21 mm prepreg
@@ -153,12 +156,14 @@ our own router (`maze_route.py`: coarse 0.25 mm pass for measurement/supply/coil
 0.125 mm pass with exact-geometry fan-out of the 0.5 mm-pitch packages, exact clearance verification
 of every emitted segment and via, and rip-up-and-reroute that never touches the generator's
 pre-routes, listed in `relay_board_prerouted.json`). To make the MCU routable, all 23 relay-drive
-pins sit on the package sides that face the drivers (north row PA0-PA2, PC14, PC15, PF0, PF1; west
+pins sit on the package sides that face the drivers (north row PA0-PA2, PC13-PC15, PF0; west
 PA3-PB11; east PB5-PB7, PA15, PB3, PB4); none wraps around the package through the USB/SWD corner.
 The south row carries what goes south or east: COIL_EN PB12, COIL_FLT PB13 (coil switch U11 is
 south-west), LED_PROG PB14, LED_KELVIN PB15, LED_BUSY PA8. PROG avoids PA9/PA10/PA14/PA15, which
-the ROM bootloader drives (AN2606). The BOOT0 strap parts sit north-east, clear of the east pins'
-escape band, and other parts' GND vias keep 2.2 mm off every fine-pitch pin row.
+the ROM bootloader drives (AN2606). The BOOT0 strap parts sit beside the BOOT button, south-east of the SWD
+header and out of the east lane fan (BOOT0 leaves its pin inward, under the package, on B.Cu);
+the SWD header is turned so its SWDIO/SWCLK column faces the MCU; other parts' GND vias keep
+2.2 mm off every fine-pitch pin row.
 
 **Placement rules learned while routing without an autorouter (2026-10-12).** Relay-drive pins
 are assigned in lane order (see `generate_schematic.GPIO_PINS`): every driver input sits on one
@@ -175,14 +180,18 @@ the +5V_IN feed crosses the USB chain on B.Cu, and the pair stays on F.Cu withou
 
 ## 6. DUT interface, housekeeping and protection (added 2026-10-11)
 
-**DUT interface.** Eight 4 mm PCB banana jacks, a Kelvin pair per terminal (F inner, S outer,
-19.05 mm = the standard dual-banana pitch). Default accessory: Grayhill 02-1 spring test clips
-(banana-plug version of the 02 series); the DUT lead passes through the F clip into the S clip,
-so sense contacts the lead itself. The same jacks take Kelvin clip leads with dual banana plugs
-or a plug-in DUT adapter board (SMD / planar / bobbin parts: review point 1). Banana and clip
-contact resistance sits only in the force path; in 2-wire mode the jack + clip (~30 nH,
-~0.3-0.5 pF between neighbours) is fixed geometry inside the clamp-plane fixture compensation
-(compensate with the clips plugged in).
+**DUT interface.** Eight Grayhill 02-21 miniature test clips (the banana-plug style; the other
+Series 02 styles are obsolete), a Kelvin pair per terminal, F inner and S outer, 8 mm apart. Each
+clip's standard banana plug sits straight in a plated 4.0 mm hole (the bore of a 4 mm socket: the
+plug's spring grips the barrel; solder it for a permanent fixture) -- no separate jack. The DUT
+lead passes through the F clip into the S clip, so sense contacts the lead itself, at 8 mm
+effectively the same point. The clip is 5.54 mm thick along the lead and 10.31 mm wide across it
+(Grayhill Series 02 datasheet): 2.5 mm between the clips of a pair, 13.7 mm between the two
+terminals of a side. The bay between the F clips is 41 mm wide (F to F 54 mm): the clip pairs and
+their iso relays sit as far out as the link relays K15/K16 allow. The plug is 23.8 mm long and
+stands ~22 mm below the board: 25 mm standoffs under the five mounting holes. Clip contact
+resistance sits only in the force path; in 2-wire mode the clip is fixed geometry inside the
+clamp-plane fixture compensation (compensate with the clips fitted).
 
 **Housekeeping.** Status LEDs (PWR, RUN, BUSY, KELVIN, PROG). TMP117 (+/-0.1 C) beside the
 standards column: every calibration records the fixture temperature and is re-acquired when it

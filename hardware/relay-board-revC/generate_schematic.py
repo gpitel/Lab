@@ -119,12 +119,18 @@ ULN_OUT = {n: str(17 - n) for n in range(1, 8)}
 #: pins reach their inputs from inside the driver packages (top->bottom:
 #: U3 p7, U2 p1..p7). Each group is monotonic in input height: no crossings.
 #: corner. I2C2 is on the west pins PB10/PB11, facing the TMP117 (I2C on
-#: the east pins crossed the whole relay corridor). PC14/PC15/PF0/PF1 are plain GPIO here (no crystals, 3 mA is plenty
+#: the east pins crossed the whole relay corridor). PC13/PC14/PC15/PF0 are plain GPIO here (no crystals, 3 mA is plenty
 #: for a TBD62003 input). The south row keeps the functions that go south or
 #: east: coil-switch enable/fault, BUSY/KELVIN/PROG LEDs.
+#: The north row splits at the VDDA/NRST parts over pins 7-9: PA0..PA2 (west
+#: of them) can only leave north-west and reach the drivers from the WEST,
+#: under U6's body, where the order is mirrored (eastmost pin = southmost
+#: input: PA0 -> U6 p1, PA1 -> U6 p2, PA2 -> U4 p1). PC13..PF0 (east of them)
+#: join the east channel (PF0 -> U4 p2 .. PC13 -> U4 p5). PF1 (pin 6) sits
+#: under the NRST parts with no outward escape and stays unused.
 GPIO_PINS = ["PA4", "PA5", "PA6", "PA7", "PB0", "PB1", "PB2", "PB7",
-             "PB6", "PB5", "PB4", "PB3", "PA15", "PA3", "PA0", "PF1",
-             "PF0", "PC15", "PC14", "PB9", "PB8", "PA2", "PA1"]
+             "PB6", "PB5", "PB4", "PB3", "PA15", "PA3", "PA2", "PF0",
+             "PC15", "PC14", "PC13", "PB9", "PB8", "PA0", "PA1"]
 RELAY_COUNT = len(GPIO_PINS)
 
 #: (terminal, rail) for the eight crossbar relays, K1..K8.
@@ -357,18 +363,19 @@ class Builder:
         self.unused("K22", P1_NO, P2_NO)
 
     def build_connectors(self):
-        # DUT interface: a Kelvin PAIR of 4 mm banana jacks per terminal
-        # (force + sense, 19.05 mm apart). Grayhill 02-1 test clips plug in
-        # (the lead goes through the F clip into the S clip, so sense touches
-        # the lead itself); Kelvin clip leads with dual banana plugs or a
-        # plug-in DUT adapter board fit the same jacks.
+        # DUT interface: a Kelvin PAIR of Grayhill 02-21 miniature test clips
+        # per terminal (force + sense, 8 mm apart: the same point of the DUT
+        # lead, which goes through the F clip into the S clip). Each clip's
+        # 4 mm banana plug sits straight in a plated 4.0 mm hole -- no jack
+        # (the other Series 02 styles are obsolete).
         for index, terminal in enumerate("ABCD"):
             for offset, (kind, net) in enumerate((("F", "DUT"), ("S", "DUTS"))):
                 reference = f"J{10 + 2 * index + offset}"
                 self.add("Connector:Conn_01x01_Pin", reference, f"DUT {terminal} {kind}",
-                         330 + 15 * (2 * index + offset), 45, "Connector:Banana_Jack_1Pin",
+                         330 + 15 * (2 * index + offset), 45,
+                         "OpenMagnetics:Grayhill_02-21_BananaPlug_4mm",
                          Description=f"DUT terminal {terminal} "
-                                     f"{'force' if kind == 'F' else 'sense'} jack (4 mm)")
+                                     f"{'force' if kind == 'F' else 'sense'} clip (Grayhill 02-21)")
                 self.net(reference, "1", f"{net}_{terminal}")
 
         # Bode 100 interface: the B-WIC's impedance bridge, integrated.
@@ -519,6 +526,11 @@ class Builder:
                  "Package_TO_SOT_SMD:SOT-23-5",
                  Description="coil supply switch: soft start, current limit, fault flag")
         self.net("U11", "5", "+5V_IN")
+        # 100 nF at the IN pin (TI: 0.1 uF close to IN); the +5V_IN bulk C1 is 12 mm away
+        self.add("Device:C", "C37", "100nF", 340, 295, C0402,
+                 Description="coil switch input decoupling at U11 IN")
+        self.net("C37", "1", "+5V_IN")
+        self.net("C37", "2", "GND")
         self.net("U11", "1", "+5V")
         self.net("U11", "2", "GND")
         self.net("U11", "4", "COIL_EN")
@@ -674,7 +686,7 @@ class Builder:
 
         # No crystal: the F072 runs USB from HSI48 with CRS auto-trim off
         # the USB SOF -- proven silicon, and it removes a congested routing
-        # cluster next to the MCU (PF0/PF1 stay free for future use).
+        # cluster next to the MCU (PF1 stays free for future use).
 
         self.add("Device:R", "R3", "10k", 460, 120, "Resistor_SMD:R_0402_1005Metric",
                  Description="NRST pull-up")

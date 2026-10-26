@@ -1,0 +1,59 @@
+Comment,Designator,Footprint,Quantity,Manufacturer Part,Description
+10uF,"C1,C23,C32,C33,C34,C35",C_0805_2012Metric,6,,C_0805_2012Metric
+1uF,C18,C_0402_1005Metric,1,,C_0402_1005Metric
+10nF,C19,C_0402_1005Metric,1,,C_0402_1005Metric
+4.7uF,"C2,C29",C_0805_2012Metric,2,,C_0805_2012Metric
+47uF,C22,C_1206_3216Metric,1,X5R 10 V 1206,front-end output DC block
+1uF,"C3,C4,C20,C21",C_0603_1608Metric,4,,C_0603_1608Metric
+10pF C0G,C30,C_0603_1608Metric,1,,C_0603_1608Metric
+4.7nF 100V,C31,C_0603_1608Metric,1,,C_0603_1608Metric
+100nF,"C5,C6,C7,C8,C9,C10,C11,C12,C15,C16,C17,C25,C26,C27,C28,C36,C37",C_0402_1005Metric,17,,C_0402_1005Metric
+RUN,D1,LED_0603_1608Metric,1,0603 LED green,status: firmware running / USB host
+USBLC6-2SC6,D2,SOT-23-6,1,ST USBLC6-2SC6,"USB 2.0 ESD array, IEC 61000-4-2 level 4"
+BAV99,"D3,D4",SOT-23,2,"Nexperia BAV99,215",front-end input clamp
+PWR,D5,LED_0603_1608Metric,1,0603 LED green,status: power
+BUSY,D6,LED_0603_1608Metric,1,0603 LED amber,status: relays switching
+KELVIN,D7,LED_0603_1608Metric,1,0603 LED blue,status: Kelvin mode
+PROG,D8,LED_0603_1608Metric,1,0603 LED red (KT-0603R),status: DFU / firmware update
+SMF5.0A,D9,D_SOD-123F,1,,D_SOD-123F
+220R@100MHz 2A,FB1,L_0805_2012Metric,1,Murata BLM21PG221SN1D,"VBUS ferrite, 2 A"
+600R@100MHz,"FB2,FB3",L_0603_1608Metric,2,Sunlord GZ1608D601TF,"ferrite, 200 mA (VDDA, +5VA)"
+USB-C,J1,USB_C_Receptacle_HRO_TYPE-C-31-M-12,1,HRO TYPE-C-31-M-12,"USB-C receptacle, USB 2.0, 16 pin"
+DUT A F,J10,Grayhill_02-21_BananaPlug_4mm,1,Grayhill 02-21 miniature test clip (banana plug),"Kelvin pair per terminal (F/S, 8 mm apart); plug straight into the plated 4.0 mm hole, hand-fitted (solder for a permanent fixture)"
+DUT A S,J11,Grayhill_02-21_BananaPlug_4mm,1,Grayhill 02-21 miniature test clip (banana plug),"Kelvin pair per terminal (F/S, 8 mm apart); plug straight into the plated 4.0 mm hole, hand-fitted (solder for a permanent fixture)"
+DUT B F,J12,Grayhill_02-21_BananaPlug_4mm,1,Grayhill 02-21 miniature test clip (banana plug),"Kelvin pair per terminal (F/S, 8 mm apart); plug straight into the plated 4.0 mm hole, hand-fitted (solder for a permanent fixture)"
+DUT B S,J13,Grayhill_02-21_BananaPlug_4mm,1,Grayhill 02-21 miniature test clip (banana plug),"Kelvin pair per terminal (F/S, 8 mm apart); plug straight into the plated 4.0 mm hole, hand-fitted (solder for a permanent fixture)"
+DUT C F,J14,Grayhill_02-21_BananaPlug_4mm,1,Grayhill 02-21 miniature test clip (banana plug),"Kelvin pair per terminal (F/S, 8 mm apart); plug straight into the plated 4.0 mm hole, hand-fitted (solder for a permanent fixture)"
+DUT C S,J15,Grayhill_02-21_BananaPlug_4mm,1,Grayhill 02-21 miniature test clip (banana plug),"Kelvin pair per terminal (F/S, 8 mm apart); plug straight into the plated 4.0 mm hole, hand-fitted (solder for a permanent fixture)"
+DUT D F,J16,Grayhill_02-21_BananaPlug_4mm,1,Grayhill 02-21 miniature test clip (banana plug),"Kelvin pair per terminal (F/S, 8 mm apart); plug straight into the plated 4.0 mm hole, hand-fitted (solder for a permanent fixture)"
+DUT D S,J17,Grayhill_02-21_BananaPlug_4mm,1,Grayhill 02-21 miniature test clip (banana plug),"Kelvin pair per terminal (F/S, 8 mm apart); plug straight into the plated 4.0 mm hole, hand-fitted (solder for a permanent fixture)"
+BNC SOURCE,J6,BNC_Amphenol_B6252HB-NPP3G-50_Horizontal,1,Amphenol B6252HB-NPP3G-50,50R right-angle BNC jack
+BNC CH1,J7,BNC_Amphenol_B6252HB-NPP3G-50_Horizontal,1,Amphenol B6252HB-NPP3G-50,50R right-angle BNC jack
+SWD,J8,PinHeader_2x05_P1.27mm_Vertical_SMD,1,CNC Tech 3220-10-0300-00,"1.27 mm 2x5 Cortex debug header, SMD"
+BNC CH2,J9,BNC_Amphenol_B6252HB-NPP3G-50_Horizontal,1,Amphenol B6252HB-NPP3G-50,50R right-angle BNC jack
+G6K-2F-RF-S DC5,"K1,K2,K3,K4,K5,K6,K7,K8,K9,K10,K11,K12,K13,K14,K15,K16,K17,K18,K19,K20,K21,K22,K23",Relay_Omron_G6K-2F-RF-S,23,Omron G6K-2F-RF-S DC5,"high-frequency DPDT relay, 5 V coil"
+90R CM,L1,L_CommonModeChoke_Coilank_ACM2012,1,TDK ACM2012-900-2P-T002,"USB CM choke, 90R @100 MHz; windings 1-4 / 2-3"
+5.1k,"R1,R2",R_0402_1005Metric,2,,R_0402_1005Metric
+4.7k,"R10,R32,R33,R35,R38,R39",R_0402_1005Metric,6,,R_0402_1005Metric
+1k 0.1%,R12,R_0805_2012Metric,1,Vishay TNPW08051K00BEEA,bridge RV1: 1k 0.1% 25 ppm thin film
+47R 0.1%,"R13,R16",R_0805_2012Metric,2,Vishay TNPW080547R0BEEA,bridge RV2/RC2: 47R 0.1% 25 ppm thin film
+4R7,"R14,R15",R_0805_2012Metric,2,UNI-ROYAL TC0525B470KT5G (LCSC C21571495),"bridge RC1 shunt half: 4R7 0.1% 25 ppm thin film, JLC stock (two in parallel = 2R35); equivalent: Vishay TNPW08054R70BEEA"
+1k,"R17,R34",R_0402_1005Metric,2,,R_0402_1005Metric
+1R 0.5%,R18,R_1206_3216Metric,1,,R_1206_3216Metric
+100k,"R20,R22,R29,R40",R_0402_1005Metric,4,,R_0402_1005Metric
+100R,"R21,R23",R_0402_1005Metric,2,,R_0402_1005Metric
+1k 0.1%,"R24,R25,R26,R27",R_0603_1608Metric,4,Yageo RT0603BRD071KL,"front-end difference stage, 0.1 % 25 ppm"
+49.9R,R28,R_0402_1005Metric,1,,R_0402_1005Metric
+10k,"R3,R4,R31,R41",R_0402_1005Metric,4,,R_0402_1005Metric
+18k,R30,R_0402_1005Metric,1,,R_0402_1005Metric
+1M,R36,R_0603_1608Metric,1,,R_0603_1608Metric
+0R,R37,R_0603_1608Metric,1,,R_0603_1608Metric
+100R 0.1%,R5,R_0805_2012Metric,1,Vishay TNPW0805100RBEEA,LOAD standard: 100R 0.1% 25 ppm thin film
+BOOT,SW1,SW_SPST_TL3342,1,C&K TL3342F160QG (or XKB TS-1187A-B-A-B),SMD tact switch: hold at power-up for ROM DFU
+RESET,SW2,SW_SPST_TL3342,1,C&K TL3342F160QG (or XKB TS-1187A-B-A-B),SMD tact switch: NRST
+STM32F072CBT6,U1,LQFP-48_7x7mm_P0.5mm,1,ST STM32F072CBT6,"Cortex-M0, 128K flash, crystal-less USB (HSI48 + CRS)"
+TPS2051CDBV,U11,SOT-23-5,1,,SOT-23-5
+TMP117AIDRV,U12,WSON-6-1EP_2x2mm_P0.65mm_EP1x1.6mm,1,,WSON-6-1EP_2x2mm_P0.65mm_EP1x1.6mm
+TBD62003APG,"U2,U3,U4,U6",SOIC-16_3.9x9.9mm_P1.27mm,4,Toshiba TBD62003AFG,7ch DMOS sink driver (SOIC-16 = AFG suffix)
+AP2112K-3.3,U5,SOT-23-5,1,Diodes AP2112K-3.3TRG1,"3.3 V 600 mA LDO, 250 mV dropout"
+OPA356,"U7,U8,U9,U10",SOT-23-5,4,TI OPA356AIDBVR,"200 MHz RRO op-amp, single 2.5-5.5 V (Kelvin front-end)"

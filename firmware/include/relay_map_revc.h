@@ -27,8 +27,8 @@
 #define MASK_KELVIN 0x600000u
 #define MASK_ISOLATION 0x003C00u
 
-/* GPIO per relay K1..K24: 16 * port + bit, port A=0, B=1, C=2, F=3. */
-#define RELAY_GPIO_TABLE { 4u, 5u, 6u, 7u, 16u, 17u, 18u, 23u, 22u, 21u, 20u, 19u, 15u, 3u, 0u, 49u, 48u, 47u, 46u, 25u, 24u, 2u, 1u }
+/* GPIO per relay K1..K23: 16 * port + bit, port A=0, B=1, C=2, F=3. */
+#define RELAY_GPIO_TABLE { 4u, 5u, 6u, 7u, 16u, 17u, 18u, 23u, 22u, 21u, 20u, 19u, 15u, 3u, 2u, 48u, 47u, 46u, 45u, 25u, 24u, 0u, 1u }
 
 /* CONF:MEAS words (2-wire; Kelvin ORs MASK_KELVIN) */
 #define CONFIG_TABLE { \

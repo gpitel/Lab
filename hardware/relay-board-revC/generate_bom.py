@@ -39,8 +39,9 @@ PART_NUMBERS = {
         ("Vishay TNPW080547R0BEEA",
          "bridge RV2/RC2: 47R 0.1% 25 ppm thin film"),
     ("4R7", "R_0805_2012Metric"):
-        ("Vishay TNPW08054R70BEEA",
-         "bridge RC1 shunt half: 4R7 0.1% (two in parallel = 2R35)"),
+        ("UNI-ROYAL TC0525B470KT5G (LCSC C21571495)",
+         "bridge RC1 shunt half: 4R7 0.1% 25 ppm thin film, JLC stock "
+         "(two in parallel = 2R35); equivalent: Vishay TNPW08054R70BEEA"),
     ("BNC SOURCE", "BNC_Amphenol_B6252HB-NPP3G-50_Horizontal"):
         ("Amphenol B6252HB-NPP3G-50", "50R right-angle BNC jack"),
     ("BNC CH1", "BNC_Amphenol_B6252HB-NPP3G-50_Horizontal"):
@@ -63,7 +64,7 @@ PART_NUMBERS = {
         ("TI OPA356AIDBVR", "200 MHz RRO op-amp, single 2.5-5.5 V (Kelvin front-end)"),
     ("BAV99", "SOT-23"): ("Nexperia BAV99,215", "front-end input clamp"),
     ("90R CM", "L_CommonModeChoke_Coilank_ACM2012"):
-        ("TDK ACM2012-900-2P-T002", "USB CM choke, 90R @100 MHz; verify pinout 1-2/3-4"),
+        ("TDK ACM2012-900-2P-T002", "USB CM choke, 90R @100 MHz; windings 1-4 / 2-3"),
     ("220R@100MHz 2A", "L_0805_2012Metric"):
         ("Murata BLM21PG221SN1D", "VBUS ferrite, 2 A"),
     ("600R@100MHz", "L_0603_1608Metric"):
@@ -74,8 +75,16 @@ PART_NUMBERS = {
         ("X5R 10 V 1206", "front-end output DC block"),
 }
 
-CLAMP_NOTE = ("Cinch/Johnson 108-0740-001 4 mm PCB banana jack + Grayhill 02-1 test clip",
-              "Kelvin pair per terminal (F/S, 19.05 mm); hand-fitted, clips are an accessory")
+CLAMP_NOTE = ("Grayhill 02-21 miniature test clip (banana plug)",
+              "Kelvin pair per terminal (F/S, 8 mm apart); plug straight into the plated 4.0 mm hole, "
+              "hand-fitted (solder for a permanent fixture)")
+
+#: Mechanical parts that are not components: (item, quantity, part, note)
+HARDWARE = [
+    ("Standoff M3 x 25 mm, F-F", 5, "Wurth 970250321 (WA-SSTII, steel; or any M3 hex standoff >= 25 mm)",
+     "legs under H1-H5: the 02-21 banana plugs stand ~22 mm below the board"),
+    ("Screw M3 x 6 mm", 5, "any", "board to standoffs"),
+]
 
 
 def main():
@@ -114,6 +123,12 @@ def main():
     lines += [
         "",
         f"Total placements: {total}",
+        "",
+        "Hardware (not in the netlist):",
+        "",
+        "| Item | Qty | Part | Notes |",
+        "|------|-----|------|-------|",
+    ] + [f"| {item} | {quantity} | {part} | {note} |" for item, quantity, part, note in HARDWARE] + [
         "",
         "Notes:",
         "- All components on the top side; single-sided assembly.",

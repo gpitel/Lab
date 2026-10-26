@@ -58,3 +58,36 @@ routed fab board) and rev C (KiCad 10, 6 layers, JLC06161H-3313). Entry point he
   the HI or LO potential. A fixture-aware mode could distinguish "nodes at a fixed
   potential" (planes fine) from "floating / intermediate-potential nodes" (planes cost
   accuracy), which is the real trade-off on this class of board.
+
+## 2026-10-12 -- rev C routed board (4 layers, JLC04161H-7628), Faraday d73ca92 built on Linux (WSL)
+
+- Builds cleanly with g++ / CMake / Ninja on Ubuntu 22.04 (`-DFARADAY_BUILD_TESTS=OFF`, target `faraday_cli`).
+- **Unfilled zones read as "no reference plane"** on every layer (4 HIGH findings). A board saved
+  before zone fill is a common state for generated boards; a hint ("zones are not filled") instead
+  of a plane finding would save a wrong conclusion.
+- **Grouped findings carry no net ids** ("Return-path breaks on B.Cu: 63 nets", `netA`/`netB` absent),
+  so per-net waivers no longer match: `faraday_review.py` waived 0 of 135. A `nets` array on grouped
+  findings would let a waiver list apply.
+- New useful findings on this board: VBUS TVS 10 mm from the USB-C pin (~243 V overshoot estimate);
+  C1 12 mm from the coil switch; 43 open stubs (unused tails of fine-pitch escape stubs).
+- `esd-clamp-distance` picked D9 (TVS) and did not count the USBLC6's VBUS pin as a clamp on that net.
+- The relay-drive lanes (23 static lines) are reported as coupled bundles with 3W violations; a way
+  to mark nets as static (DC during the measurement) would move them out of the way.
+
+## 2026-10-13 -- final rev C board (two signal layers, solid inner GND with openings under floating nodes)
+
+- **Open stubs: 96 reported, 91 of them T-junctions** (a track end on the body of another track of
+  its net; KiCad DRC had 0 dangling). After splitting the tracks at every junction: 0. The rule
+  should accept an end that lies in the copper of another segment of its net.
+- **Grouped plane-crossing length** is the length of every segment that touches an opening, not
+  the uncovered length (2660 mm reported vs 1283 mm uncovered on B.Cu; 330 vs 1190 mm on F.Cu).
+- **Rings of plane openings**: KiCad removes the enclosed ground as an island; Faraday showed the
+  result (a third of the outer copper uncovered) without pointing at the cause. A hint when a
+  large plane area is missing next to a keepout ring would have saved a routing iteration.
+- **diff-skew** reported 9 mm on the front-end input pair; the signal paths are 2 mm each, the rest
+  is a branch to a 100 k bias resistor.
+- **esd-clamp-distance** still does not count the USBLC6's VBUS pin; **decoupling-distance** still
+  flags the bulk capacitors of ICs that have a capacitor at the pin; relay-drive lanes and coil
+  returns (static) still fill the bundle / 3W findings.
+- Result on the final board: 92 findings (3 high: two grouped plane-crossings that are the
+  intentional openings, one ESD distance), none an open stub.
