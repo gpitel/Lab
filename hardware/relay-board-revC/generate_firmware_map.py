@@ -91,7 +91,7 @@ def main():
 #define MASK_KELVIN 0x{kelvin:06X}u
 #define MASK_ISOLATION 0x{sum(1 << b for b in b2.ISOLATE_BITS.values()):06X}u
 
-/* GPIO per relay K1..K24: 16 * port + bit, port A=0, B=1, C=2, F=3. */
+/* GPIO per relay K1..K{b2.RELAY_COUNT}: 16 * port + bit, port A=0, B=1, C=2, F=3. */
 #define RELAY_GPIO_TABLE {{ {gpio} }}
 
 {c_table("CONFIG_TABLE", meas, "CONF:MEAS words (2-wire; Kelvin ORs MASK_KELVIN)")}

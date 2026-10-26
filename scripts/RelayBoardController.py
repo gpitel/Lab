@@ -237,7 +237,11 @@ class RelayBoardController:
         # rev C has the Kelvin crossbar and its own relay map (RelayMapRevC).
         fields = self.identity.split(",")
         self.revision = fields[2].strip() if len(fields) > 2 else "revB"
-        self.relay_count = 24 if self.revision == "revC" else RELAY_COUNT
+        if self.revision == "revC":
+            import RelayMapRevC
+            self.relay_count = RelayMapRevC.RELAY_COUNT
+        else:
+            self.relay_count = RELAY_COUNT
         self.kelvin = False
         self.current_config = None
         self.current_path = None
